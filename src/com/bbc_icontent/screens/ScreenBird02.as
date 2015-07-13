@@ -1,13 +1,18 @@
 package com.bbc_icontent.screens
 {
 	import com.bbc_icontent.Screen;
+	import com.greensock.TimelineMax;
+	import com.greensock.TweenLite;
+	import com.greensock.plugins.GlowFilterPlugin;
+	import com.greensock.plugins.TweenPlugin;
 	import com.mcc.interactives.utils.DelayCall;
 	
-	import flash.display.MovieClip;
 	import flash.display.Sprite;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
+	import flash.geom.Point;
 	import flash.text.TextField;
+	
 	
 	public class ScreenBird02 extends Screen
 	{
@@ -19,6 +24,15 @@ package com.bbc_icontent.screens
 		private var container01:Sprite;
 		private var container02:Sprite;
 		private var container03:Sprite;
+		private var containers:Vector.<Sprite>;
+		
+		private var notificationTry:Sprite;
+		private var notificationSuccess:Sprite;
+		
+		private var homePoint:Point, swapPoint:Point;
+		
+		
+		TweenPlugin.activate([GlowFilterPlugin]);
 		
 		public function ScreenBird02()
 		{
@@ -42,6 +56,16 @@ package com.bbc_icontent.screens
 			container02.visible = false;
 			container03 = mainSkin.container03;
 			container03.visible = false;
+			
+			containers=new Vector.<Sprite>();
+			containers.push(container01, container02, container03);
+			
+			notificationTry = mainSkin.tryBird;
+			notificationTry.visible = false;
+			notificationSuccess = mainSkin.successBird;
+			notificationSuccess.visible = false;
+			
+			homePoint=new Point();
 		}
 		
 		override public function show():void
@@ -90,27 +114,110 @@ package com.bbc_icontent.screens
 			container01.addEventListener(MouseEvent.MOUSE_DOWN, dragEnable);
 			container02.addEventListener(MouseEvent.MOUSE_DOWN, dragEnable);
 			container03.addEventListener(MouseEvent.MOUSE_DOWN, dragEnable);
+			
 		}
 		
 		private var currentMoving:Sprite;
 		private function dragEnable(e:MouseEvent):void{
 			currentMoving = e.currentTarget as Sprite;
-			currentMoving.removeEventListener(MouseEvent.MOUSE_DOWN, dragEnable);
-			currentMoving.startDrag(true);
+			trace("currentMoving: "+currentMoving.name);
+			homePoint.x=currentMoving.x;
+			homePoint.y=currentMoving.y;
+			
+			this.addChild(currentMoving);			
+			currentMoving.startDrag();
 			
 			stage.addEventListener(MouseEvent.MOUSE_UP, mouseUpHandler);
 			stage.addEventListener(MouseEvent.MOUSE_MOVE, mouseMoveHandler);
 		}
 		
 		private function mouseMoveHandler(e:MouseEvent):void{
-			checkCollision();
+			
 		}
 		private function mouseUpHandler(e:MouseEvent):void{
+			stopDrag();
+			
+			stage.removeEventListener(MouseEvent.MOUSE_UP, mouseUpHandler);
+			stage.removeEventListener(MouseEvent.MOUSE_MOVE, mouseMoveHandler);
+			
+			var currentTarget:Sprite =checkCollision(currentMoving);
+			
+			if(currentTarget!=null){
+				swapPoint=new Point(currentTarget.x, currentTarget.y);
+				TweenLite.to(currentMoving, 1, {x:swapPoint.x, y:swapPoint.y, onComplete:onCompleteTween });
+				TweenLite.to(currentTarget, 1, {x:homePoint.x, y:homePoint.y, onComplete:onCompleteTween });
+			}else{
+				TweenLite.to(currentMoving, 1, {x:homePoint.x, y:homePoint.y, onComplete:onCompleteTween });	
+			}
+			
 			
 		}
 		
-		private function checkCollision():void{
+		private function onCompleteTween():void{
+			trace("complete tween");
 			
+			
+			stage.addEventListener(MouseEvent.MOUSE_UP, mouseUpHandler);
+			stage.addEventListener(MouseEvent.MOUSE_MOVE, mouseMoveHandler);
+			
+			checkResult();
+		}
+		
+		private function checkResult():void{
+			trace(container01.x+"<>"+container02.x+"<>"+container03.x);
+			
+			if(container03.x > container02.x  && container02.x > container01.x){
+				trace("glowing...................");
+				
+				var myTimeline:TimelineMax = new TimelineMax({onComplete:completeTimeLine});
+				myTimeline.add([new TweenLite(container01, .25, {glowFilter:{color:0x009900, blurX:50, blurY:50, strength:50, alpha:1, remove:true}}),
+								new TweenLite(container02, .25, {glowFilter:{color:0x009900, blurX:50, blurY:50, strength:50, alpha:1, remove:true}}),
+								new TweenLite(container03, .25, {glowFilter:{color:0x009900, blurX:50, blurY:50, strength:50, alpha:1, remove:true}}),],
+					0,
+					"start",
+					0.2);
+			}
+					
+			
+		}
+		
+		
+		
+		private function completeTimeLine():void{
+			TweenLite.to([container01,container02,container03], .5, {glowFilter:{color:0x00FF00, blurX:75, blurY:75, strength:75, alpha:1, remove:true}});
+			
+			//finish call
+		}
+		
+		
+		private function checkCollision(movingObject:Sprite):Sprite{
+			var mObject:Sprite = movingObject;
+			var targetObject:Sprite;
+			var dx:Number = 0;
+			var dy:Number = 0;
+			var distance:Number = 0;
+			var range:Number = container01.width-10;
+			
+			for(var i:int = 0; i<containers.length; i++){
+				targetObject = containers[i] as Sprite;
+				
+				
+				dx = movingObject.x - targetObject.x;
+				dy = movingObject.y - targetObject.y;
+				
+				distance = Math.sqrt(dx*dx + dy*dy);
+				if(distance < range && targetObject!=null){
+				//	targetObject.alpha = .2;
+					
+					if(movingObject!=targetObject)
+					return targetObject;
+				}
+				else{
+				//	targetObject.alpha = 1;
+				}				
+			}
+			
+			return null;
 		}
 		
 		private function reset():void{
@@ -164,8 +271,7 @@ class Speech extends Sprite{
 	
 	private function showLine():void{
 		textLine.visible = true;
-		textLine.text = ''+lines[indexLine];
-		
+		textLine.text = ''+lines[indexLine];		
 		indexLine++;
 	}
 }
